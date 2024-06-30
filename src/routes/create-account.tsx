@@ -1,5 +1,8 @@
 import { useState } from 'react';
 import styled from 'styled-components';
+import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { auth } from '../firebase';
+import { useNavigate } from 'react-router-dom';
 
 const Wrapper = styled.div`
   height: 100%;
@@ -39,6 +42,7 @@ const Error = styled.span`
 `;
 
 export default function CreateAccount() {
+  const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [inputValue, setInputValue] = useState({
@@ -57,10 +61,22 @@ export default function CreateAccount() {
 
   const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    console.log(inputValue);
-    // setIsLoading(true);
+    if (isLoading) return;
+    if (!inputValue.email || !inputValue.password || !inputValue.name) {
+      setError('Please fill out all fields');
+      return;
+    }
     try {
+      setIsLoading(true);
       // create account
+      const credential = await createUserWithEmailAndPassword(
+        auth,
+        inputValue.email,
+        inputValue.password,
+      );
+      console.log(credential.user);
+      await updateProfile(credential.user, { displayName: inputValue.name });
+      navigate('/');
     } catch (error) {
       console.error(error);
       // setError(error);
@@ -97,7 +113,11 @@ export default function CreateAccount() {
           placeholder='Password'
           required
         />
-        <Input type='submit' value={isLoading ? 'Loading...' : 'Create Account'} />
+        <Input
+          type='submit'
+          value={isLoading ? 'Loading...' : 'Create Account'}
+          disabled={isLoading}
+        />
       </Form>
       {error && <Error>{error}</Error>}
     </Wrapper>

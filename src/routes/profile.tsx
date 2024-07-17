@@ -1,8 +1,11 @@
 import styled from 'styled-components';
-import { auth, storage } from '../firebase';
-import { useState } from 'react';
+import { auth, db, storage } from '../firebase';
+import { useEffect, useState } from 'react';
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { updateProfile } from 'firebase/auth';
+import { collection, getDocs, limit, onSnapshot, orderBy, query, where } from 'firebase/firestore';
+import { ITweet } from '../components/time-line';
+import Tweet from '../components/tweet';
 
 const Wrapper = styled.div`
   display: flex;
@@ -34,9 +37,16 @@ const Name = styled.span`
   font-size: 22px;
 `;
 
+const Tweets = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+`;
+
 export default function Profile() {
   const user = auth.currentUser;
   const [avatar, setAvatar] = useState<string | null>(user?.photoURL ?? null);
+  const [tweets, setTweets] = useState<ITweet[]>([]);
 
   const onAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const { files } = e.target;
@@ -50,6 +60,25 @@ export default function Profile() {
       setAvatar(avatarUrl);
     }
   };
+
+  const fetchTweet = async () => {
+    const tweetsQuery = query(
+      collection(db, 'tweets'),
+      where('userId', '==', user?.uid),
+      orderBy('createdAt', 'desc'),
+      limit(10),
+    );
+    const snapShot = await getDocs(tweetsQuery);
+    const tweets = snapShot.docs.map(doc => {
+      const { photo, tweet, username, createdAt, userId } = doc.data();
+      return { id: doc.id, photo, tweet, username, createdAt, userId };
+    });
+    setTweets(tweets);
+  };
+
+  useEffect(() => {
+    fetchTweet();
+  }, []);
 
   return (
     <Wrapper>
@@ -76,6 +105,11 @@ export default function Profile() {
 
       <AvatarInput onChange={onAvatarChange} id='avatar' type='file' accept='image/*' />
       <Name>{user?.displayName ?? 'Anonymous'}</Name>
+      <Tweets>
+        {tweets.map(tweet => (
+          <Tweet key={tweet.id} {...tweet} />
+        ))}
+      </Tweets>
     </Wrapper>
   );
 }

@@ -1,5 +1,9 @@
+import { deleteDoc, doc, updateDoc } from 'firebase/firestore';
+import { auth, db, storage } from '../firebase';
 import { ITweet } from './time-line';
 import styled from 'styled-components';
+import { deleteObject, ref } from 'firebase/storage';
+import { useEffect, useState } from 'react';
 
 const Wrapper = styled.div`
   display: grid;
@@ -13,9 +17,11 @@ const Username = styled.div`
   font-weight: 600;
   font-size: 15px;
 `;
-const Payload = styled.p`
+const Payload = styled.input`
   margin: 10px 0px;
   font-size: 18px;
+  background-color: transparent;
+  color: white;
 `;
 const Photo = styled.img`
   width: 100px;
@@ -23,12 +29,82 @@ const Photo = styled.img`
   border-radius: 15px;
 `;
 
-export default function Tweet({ username, tweet, photo }: ITweet) {
+const Flex = styled.div`
+  display: flex;
+  gap: 10px;
+`;
+
+const DeleteButton = styled.button`
+  background-color: tomato;
+  color: white;
+  font-weight: 600;
+  border: 0;
+  font-size: 12px;
+  padding: 5px 10px;
+  text-transform: uppercase;
+  border-radius: 5px;
+  cursor: pointer;
+`;
+
+const EditButton = styled.button`
+  background-color: skyblue;
+  color: white;
+  font-weight: 600;
+  border: 0;
+  font-size: 12px;
+  padding: 5px 10px;
+  text-transform: uppercase;
+  border-radius: 5px;
+  cursor: pointer;
+`;
+
+export default function Tweet({ username, tweet, photo, userId, id }: ITweet) {
+  const [editMode, setEditMode] = useState(false);
+  const [tweetValue, setTweetValue] = useState('');
+  const user = auth.currentUser;
+  const onDelete = async () => {
+    const ok = confirm('Are you sure you want to delete this tweet?');
+    if (!ok || user?.uid !== userId) return;
+    try {
+      await deleteDoc(doc(db, 'tweets', id));
+      if (photo) {
+        const photoRef = ref(storage, `tweets/${user.uid}-${user.displayName}/${id}`);
+        await deleteObject(photoRef);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const onEdit = async () => {
+    if (!editMode) return;
+    try {
+      await updateDoc(doc(db, 'tweets', id), { tweet: tweetValue });
+    } catch (e) {
+      console.error(e);
+    }
+    setEditMode(false);
+  };
+
+  useEffect(() => {
+    setTweetValue(tweet);
+  }, [tweet]);
+
   return (
     <Wrapper>
       <Column>
         <Username>{username}</Username>
-        <Payload>{tweet}</Payload>
+        <Payload
+          value={tweetValue}
+          onChange={e => setTweetValue(e.target.value)}
+          disabled={!editMode}
+        />
+        {user?.uid === userId && (
+          <Flex>
+            <DeleteButton onClick={onDelete}>Delete</DeleteButton>
+            <EditButton onClick={editMode ? onEdit : () => setEditMode(true)}>Edit</EditButton>
+          </Flex>
+        )}
       </Column>
       <Column>{photo && <Photo src={photo} />}</Column>
     </Wrapper>

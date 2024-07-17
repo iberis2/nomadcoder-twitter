@@ -2,7 +2,7 @@ import { deleteDoc, doc, updateDoc } from 'firebase/firestore';
 import { auth, db, storage } from '../firebase';
 import { ITweet } from './time-line';
 import styled from 'styled-components';
-import { deleteObject, ref } from 'firebase/storage';
+import { deleteObject, ref, uploadBytes } from 'firebase/storage';
 import { useEffect, useState } from 'react';
 
 const Wrapper = styled.div`
@@ -23,6 +23,11 @@ const Payload = styled.input`
   background-color: transparent;
   color: white;
 `;
+
+const EditPhoto = styled.input`
+  display: none;
+`;
+const Label = styled.label``;
 const Photo = styled.img`
   width: 100px;
   height: 100px;
@@ -60,6 +65,7 @@ const EditButton = styled.button`
 
 export default function Tweet({ username, tweet, photo, userId, id }: ITweet) {
   const [editMode, setEditMode] = useState(false);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [tweetValue, setTweetValue] = useState('');
   const user = auth.currentUser;
   const onDelete = async () => {
@@ -77,13 +83,25 @@ export default function Tweet({ username, tweet, photo, userId, id }: ITweet) {
   };
 
   const onEdit = async () => {
-    if (!editMode) return;
+    if (!editMode || !user) return;
     try {
       await updateDoc(doc(db, 'tweets', id), { tweet: tweetValue });
+      if (photoFile) {
+        const photoRef = ref(storage, `tweets/${user?.uid}-${user.displayName}/${id}`);
+        await uploadBytes(photoRef, photoFile);
+        setPhotoFile(null);
+      }
     } catch (e) {
       console.error(e);
     }
     setEditMode(false);
+  };
+
+  const onChangePhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { files } = e.target;
+    if (files && files.length === 1) {
+      setPhotoFile(files[0]);
+    }
   };
 
   useEffect(() => {
@@ -106,7 +124,20 @@ export default function Tweet({ username, tweet, photo, userId, id }: ITweet) {
           </Flex>
         )}
       </Column>
-      <Column>{photo && <Photo src={photo} />}</Column>
+      <Column>
+        {photo && (
+          <Label htmlFor='edit-photo'>
+            <Photo src={photo} />
+            <EditPhoto
+              onChange={onChangePhoto}
+              id='edit-photo'
+              type='file'
+              accept='image/*'
+              disabled={!editMode}
+            />
+          </Label>
+        )}
+      </Column>
     </Wrapper>
   );
 }
